@@ -27,10 +27,10 @@ services:
       - "5001:5001"
     env_file: .env
     environment:
-      - RAGFLOW_CHAT_ID=862d9be0543d11f196e22564053332bd
+      - RAGFLOW_CHAT_ID=${RAGFLOW_CHAT_ID}
       - FLASK_HOST=0.0.0.0
       - FLASK_PORT=5001
-      - RAGFLOW_BASE_URL=http://docker-ragflow-cpu-1:80
+      - RAGFLOW_BASE_URL=${RAGFLOW_BASE_URL}
     volumes:
       - ./packages/ai-personalization/chroma_db:/app/src/chroma_db
       - ./packages/ai-personalization/src/uploads:/app/src/uploads
@@ -78,7 +78,7 @@ services:
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
     container_name: guru-frontend
     ports:
-      - "8080:80"
+      - "5173:80"
     networks:
       - ragflow
     restart: unless-stopped
