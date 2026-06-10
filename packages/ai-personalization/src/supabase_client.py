@@ -1,3 +1,4 @@
+# TODO : Clear this out. 
 import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -18,19 +19,6 @@ class SupabaseDB:
         
         self.client: Client = create_client(url, key)
     
-    # ❌ DEPRECATED: get_teacher_by_id - only used by removed feedback_to_training endpoint
-    def get_teacher_by_id(self, teacher_id):
-        """
-        DEPRECATED: This method is no longer used (teacher-app removed)
-        Fetch teacher profile from Supabase
-        """
-        try:
-            response = self.client.table('teachers').select('*').eq('id', teacher_id).execute()
-            return response.data[0] if response.data else None
-        except Exception as e:
-            print(f"Error fetching teacher: {e}")
-            return None
-    
     def get_teachers_by_cluster(self, cluster_id):
         """Fetch all teachers in a cluster using 'cluster' column"""
         try:
@@ -47,23 +35,6 @@ class SupabaseDB:
             return response.data if response.data else []
         except Exception as e:
             print(f"Error loading mappings: {e}")
-            return []
-    
-    # ❌ DEPRECATED: get_teacher_issues - only used by removed endpoints
-    def get_teacher_issues(self, teacher_id):
-        """
-        DEPRECATED: This method is no longer used (teacher-app removed)
-        Fetch all issues from a teacher
-        """
-        try:
-            response = self.client.table('issues')\
-                .select('*')\
-                .eq('teacher_id', teacher_id)\
-                .order('created_at', desc=True)\
-                .execute()
-            return response.data if response.data else []
-        except Exception as e:
-            print(f"Error fetching issues: {e}")
             return []
     
     # Backward compatibility alias
@@ -117,24 +88,7 @@ class SupabaseDB:
             print(f"Error saving personalized training: {e}")
             return None
     
-    # ❌ DEPRECATED: get_issue_by_id - only used by removed feedback_to_training endpoint
-    def get_issue_by_id(self, issue_id: str):
-        """
-        DEPRECATED: This method is no longer used (teacher-app removed)
-        Fetch a single issue by ID
-        """
-        try:
-            response = self.client.table('issues')\
-                .select('*')\
-                .eq('id', issue_id)\
-                .single()\
-                .execute()
-            return response.data if response.data else None
-        except Exception as e:
-            print(f"Error fetching issue {issue_id}: {e}")
-            return None
-    
-    # Backward compatibility alias
+    # Backward compatibility alias 
     def get_feedback_by_id(self, feedback_id: str):
         """
         DEPRECATED: Legacy method - use get_issue_by_id instead

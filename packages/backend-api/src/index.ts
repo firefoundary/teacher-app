@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import dashboardRoutes from './dashboard-routes.js';
 import adminRoutes from './admin-routes.js';
-import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const app = express();
 
@@ -63,13 +62,6 @@ app.get('/health', (req, res) => {
 // Routes
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
-app.use(
-  '/api/public',
-  createProxyMiddleware({
-    target: process.env.AI_SERVICE_URL || 'http://localhost:5001',
-    changeOrigin: true,
-  })
-);
 
 
 // 404 handler

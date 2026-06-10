@@ -1,3 +1,4 @@
+# NOTE : Only run once and save it.
 import argparse
 import secrets
 import os

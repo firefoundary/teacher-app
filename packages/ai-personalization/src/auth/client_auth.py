@@ -32,7 +32,6 @@ def authenticate_client(client_id: str, client_secret: str) -> dict | None:
     if not bcrypt.checkpw(client_secret.encode(), client["client_secret_hash"].encode()):
         return None
 
-    # Update last_used_at (fire-and-forget, ignore errors)
     try:
         _sb.table("api_clients").update(
             {"last_used_at": "now()"}

@@ -1,3 +1,4 @@
+# NOTE : To be utilized by other teams, requires auth and whatnot. tbh they r free to use direct routes as well.
 import os
 import time
 import uuid
@@ -30,8 +31,7 @@ print("[debug] module:", getattr(ragflow_create_session, "__module__", None))
 print("[debug] name:", getattr(ragflow_create_session, "__name__", None))
 
 # ── dataset routing ──────────────────────────────────────────
-# Map high-level scope names (from partner request) to internal
-# RAGFlow dataset IDs stored in env. Partners never see these IDs.
+# TODO : Routing for multiple datasets. To be fully initialized later
 DATASET_ROUTES = {
     "student_textbooks":  os.getenv("RAGFLOW_DATASET_STUDENT_TEXTBOOKS", ""),
     "teacher_training":   os.getenv("RAGFLOW_DATASET_TEACHER_TRAINING", ""),
@@ -84,7 +84,6 @@ def create_session():
     context          = body.get("context", {})
     session_id       = _make_session_id()
 
-    # Keep scopes in session context for later message-time retrieval
     scopes = context.get("moduleScopes", DEFAULT_DATASETS)
 
     rf_session_id = None
@@ -153,7 +152,6 @@ def _get_valid_session(session_id: str, client_id: str):
     """Fetch session row, enforce ownership + expiry without crashing on 0 rows."""
     from datetime import datetime, timezone
     
-    # 1. Remove .single() so it returns an empty list instead of crashing if 0 rows are found
     result = (
         _sb.table("api_sessions")
         .select("*")
@@ -162,11 +160,9 @@ def _get_valid_session(session_id: str, client_id: str):
         .execute()
     )
     
-    # 2. Cleanly check if the list is empty
     if not result.data or len(result.data) == 0:
         return None, "session_not_found"
 
-    # 3. Safely extract the single record
     row = result.data[0]
     expires_at = datetime.fromisoformat(row["expires_at"])
     if expires_at < datetime.now(timezone.utc):
@@ -209,8 +205,6 @@ def send_message():
 
     rf_session_id = session_row.get("ragflow_session_id")
     context       = session_row.get("context_json", {})
-
-    # Resolve datasets from scope override or stored context
     scope_override = body.get("scope", [])
     scopes  = scope_override or context.get("moduleScopes", DEFAULT_DATASETS)
     ds_ids  = _resolve_datasets(scopes)
@@ -294,7 +288,6 @@ def send_message_stream():
 
 
 def _extract_sources(rf_resp: dict) -> list[dict]:
-    # Navigate to the reference array inside extra_body
     choices = rf_resp.get("choices") or []
     if not choices:
         return []

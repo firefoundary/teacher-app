@@ -92,7 +92,7 @@ function defaultFormData() {
     classGrades: '1, 2, 3, 4, 5',
     subjectAreas: 'Mathematics',
     stateCodes: 'ALL',
-    board: 'NCERT',
+    board: 'CBSE',
     programTags: 'NCERT, textbook',
     mediumTags: '',
     language: 'English',

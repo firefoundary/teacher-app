@@ -1,17 +1,17 @@
 /**
- * dashboard-routes.ts — Dashboard Management Routes (SECURED VERSION)
+ * Dashboard Management Routes 
  *
  * Handles:
  * - Issue management (list, update, delete)
  * - Dashboard statistics
  * - Teacher listings
- * - Training modules CRUD (with RAGFlow integration)
+ * - Training modules CRUD (with RAGFlow integration , calls Flask service)
  * - Training feedback endpoints
  *
  * Security:
  * - All routes require JWT authentication
  * - Module write operations require admin+ role
- * - RAGFlow calls go directly via ragflow_client (no proxy chain)
+ * - RAGFlow calls go directly via ragflow_client 
  */
 
 import { Router, Request, Response } from 'express';
@@ -584,7 +584,7 @@ router.delete('/modules/:id', requireAuth(), requireAdminOrHigher(), async (req:
   }
 });
 
-// Upload module with file (create + upload to RAGFlow + parse)
+// Upload module with file (create + upload + parse)
 router.post('/modules/upload', requireAuth(), requireAdminOrHigher(), upload.single('file'), async (req: Request, res: Response) => {
   try {
     const payload = JSON.parse(req.body.metadata || '{}');
@@ -597,7 +597,7 @@ router.post('/modules/upload', requireAuth(), requireAdminOrHigher(), upload.sin
     if (!payload.title) return res.status(400).json({ success: false, error: 'title is required' });
     if (!file) return res.status(400).json({ success: false, error: 'file is required' });
 
-    // 1. Resolve routing to get RAGFlow dataset ID
+    // Resolve routing to get RAGFlow dataset ID
     const primaryStateCode = Array.isArray(payload.stateCodes) && payload.stateCodes.length ? payload.stateCodes[0] : null;
     const routing = await resolveRoutingRow({
       sourceOrg: payload.sourceOrg || 'NCERT',
@@ -610,12 +610,12 @@ router.post('/modules/upload', requireAuth(), requireAdminOrHigher(), upload.sin
     });
 
     if (!routing?.ragflow_dataset_id) {
-      return res.status(400).json({ success: false, error: 'No dataset routing configured for this resource source.' });
+      return res.status(400).json({ success: false, error: 'No dataset routing configured for this resource source. Only for CBSE Board its configuered. (Will only work if the dataset id is set in supabase , which is currently set to my own local dataset)' });
     }
 
     const datasetId = routing.ragflow_dataset_id;
 
-    // 2. Create module in Supabase first (with empty rag_document_ids)
+    // Create module in Supabase first (with empty rag_document_ids)
     const { data: moduleRow, error: createError } = await supabase.from('training_modules').insert({
       title: payload.title,
       description: payload.description || null,
@@ -668,12 +668,9 @@ router.post('/modules/upload', requireAuth(), requireAdminOrHigher(), upload.sin
 
     let docIds: string[] = [];
 
-    // 3. Step One: Upload file to the Flask Gateway
+    // Step One: Upload file to the Flask Gateway
     console.log(`[Backend] Step 1/2: Forwarding file upload to Flask for dataset: ${datasetId}`);
     const uploadResponse = await ragflow.uploadDocument(datasetId, ragflowFile, token);
-
-    // Look at your Flask backend (ragflow_routes.py) - it maps data to a collection/list 
-    // depending on your response structure, let's process it out securely:
     if (uploadResponse.success && (uploadResponse.document_ids || uploadResponse.data)) {
       // Accommodate standard response arrays:
       docIds = uploadResponse.document_ids || uploadResponse.data;
@@ -682,7 +679,7 @@ router.post('/modules/upload', requireAuth(), requireAdminOrHigher(), upload.sin
       throw new Error(uploadResponse.error || 'Flask upload succeeded but returned no document identifiers.');
     }
 
-    // 4. Step Two: Trigger the Parsing process via Flask
+    // Step Two: Trigger the Parsing process via Flask
     if (docIds && docIds.length > 0) {
       console.log(`[Backend] Step 2/2: Requesting parsing run from Flask for document IDs:`, docIds);
       const parseResponse = await ragflow.parseDocuments(datasetId, docIds, token);
@@ -694,7 +691,7 @@ router.post('/modules/upload', requireAuth(), requireAdminOrHigher(), upload.sin
       }
     }
 
-    // 5. Final Step: Sync the generated document IDs back down to our core database row
+    // Final Step: Sync the generated document IDs back down to our core database row
     const { data: updatedRow, error: updateError } = await supabase
       .from('training_modules')
       .update({ rag_document_ids: docIds })

@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from routes.public_auth_routes import public_auth_bp
 from routes.public_chat_routes import public_chat_bp
 from lesson_planner_routes import lesson_bp
-# Load environment variables
+# Load environment variables from root
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../.env'))
 
 from flask import Flask, jsonify
@@ -32,11 +32,9 @@ print("\n" + "=" * 80)
 print("INITIALIZING AI PERSONALIZATION SERVICE")
 print("=" * 80)
 
-# Create Flask app
 app = Flask(__name__)
 CORS(app)
 
-# Register RAGFlow blueprint
 app.register_blueprint(ragflow_bp)
 app.register_blueprint(public_auth_bp)
 app.register_blueprint(public_chat_bp)

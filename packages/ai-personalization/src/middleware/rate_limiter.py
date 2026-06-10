@@ -1,6 +1,6 @@
 """
 Simple in-memory sliding-window rate limiter per client_id.
-Good enough for v1. Replace with Redis for multi-process/multi-instance deploys.
+Good enough for v1. Replace with Redis for multi-process or multi-instance deploys.
 """
 import time
 import threading

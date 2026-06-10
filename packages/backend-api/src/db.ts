@@ -1,3 +1,4 @@
+// TODO : Remove this , not utilized as frequently
 import {Pool} from 'pg';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';

@@ -13,7 +13,7 @@ Handles:
 All write routes require JWT. Generation requires admin or higher.
 Saved-plan reads are scoped to the requesting teacher.
 """
-
+# TODO : Still working on all of these , a base defination has been set and WILL need updates.
 import json
 import traceback
 import time
@@ -41,7 +41,7 @@ if os.getenv("GEMINI_API_KEY"):
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Auth decorators (same pattern as ragflow_routes.py)
+# Auth decorators 
 # ─────────────────────────────────────────────────────────────────────────────
 
 from functools import wraps
@@ -107,24 +107,22 @@ def _clean_gemini_json(text: str) -> Dict[str, Any]:
                 raw = raw[4:].strip()
     return json.loads(raw)
 
-
+#WORKS
 def _resolve_dataset_id(board: str = "CBSE", explicit_dataset_id: str = "") -> str:
     """
     Dynamically maps the requested school board to a live RAGFlow dataset UUID
     using the resource_source_routing database table.
     """
-    # 1. If the frontend explicitly provided a dataset UUID, respect it immediately
     if explicit_dataset_id:
         return explicit_dataset_id
 
-    # 2. Query your database routing configuration
     try:
         result = (
             db.client.table("resource_source_routing")
             .select("ragflow_dataset_id")
             .eq("board", board)
             .eq("is_active", True)
-            .order("priority", desc=True) # Honor your priority constraint
+            .order("priority", desc=True) 
             .execute()
         )
         
@@ -135,14 +133,13 @@ def _resolve_dataset_id(board: str = "CBSE", explicit_dataset_id: str = "") -> s
     except Exception as err:
         print(f"[WARN] Database lookup on resource_source_routing failed: {err}")
 
-    # 3. Fallback to an explicit environment variable UUID if the DB routing table is empty
     fallback_id = os.getenv("RAGFLOW_DEFAULT_DATASET_ID")
     if not fallback_id:
         raise ValueError(f"No active RAGFlow dataset mapped for board '{board}' and no default fallback configured.")
         
     return fallback_id
 
-
+#Depricated for now 
 def _teacher_cluster(teacher_id: str) -> str:
     try:
         result = (
@@ -156,7 +153,7 @@ def _teacher_cluster(teacher_id: str) -> str:
     except Exception:
         return ""
 
-
+#WORKS , base prompt for a all in one response
 def _build_lesson_prompt(
     class_name: str,
     subject: str,
@@ -229,7 +226,7 @@ Return ONLY valid JSON (no markdown fences) with this exact structure:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── 1. Generate a lesson plan (Gemini + RAGFlow context) ─────────────────────
-
+# WORKS
 @lesson_bp.route("/generate", methods=["POST"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -268,7 +265,7 @@ def generate_lesson():
         learning_objectives: List[str] = data.get("learning_objectives") or []
         auto_save        = bool(data.get("save", False))
 
-        # 1. Pull RAG context
+        # Pull RAG context
         dataset_id = ""
         chunks: List[Dict[str, Any]] = []
         try:
@@ -295,7 +292,7 @@ def generate_lesson():
                 c.get("content", "") for c in chunks[:4] if c.get("content")
             )
 
-        # 2. Build prompt & call Gemini
+        # Build prompt & call Gemini
         prompt = _build_lesson_prompt(
             class_name=class_name,
             subject=subject,
@@ -320,7 +317,7 @@ def generate_lesson():
         lesson     = result.get("lesson")
         assignment = result.get("assignment")
 
-        # 3. Optionally save to Supabase
+        # Optionally save to Supabase , normally dont ig 
         saved_id = None
         if auto_save and teacher_id and lesson:
             try:
@@ -366,8 +363,8 @@ def generate_lesson():
         return jsonify(error=str(e)), 500
 
 
-# ── 7. Topic retrieval (RAG-only, no LLM) ───────────────────────────────────
-
+# ── Topic retrieval (RAG-only, no LLM) ───────────────────────────────────
+# Not tested haha
 @lesson_bp.route("/context", methods=["POST"])
 @require_jwt(auth_required=True)
 def get_topic_context():
@@ -414,8 +411,8 @@ def get_topic_context():
         return jsonify(error=str(e)), 500
 
 
-# ── 8. Regenerate only the assignment for an existing plan ───────────────────
-
+# ── Regenerate only the assignment for an existing plan ───────────────────
+# NOTE : needs to be saved
 @lesson_bp.route("/plans/<plan_id>/assignment", methods=["POST"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()

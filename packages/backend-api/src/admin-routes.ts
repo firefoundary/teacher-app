@@ -1,18 +1,18 @@
 /**
- * admin-routes.ts — Admin Management Routes (SECURED VERSION)
+ * Admin Management Routes
  *
  * Handles:
  * - Admin authentication and profile management
- * - Teacher CRUD operations (authenticated users only)
- * - Admin user management (SUPER ADMIN only)
+ * - Teacher CRUD operations 
+ * - Admin user management 
  * - Activity logging
  *
  * Security:
- * - All routes require JWT authentication (except login)
- * - Role-based access control (SUPER_ADMIN for admin CRUD)
+ * - All routes require JWT authentication
+ * - Role-based access control
  * - Bcrypt password hashing
  */
-
+// DONE WITH FULL AUTHENTICATION
 import { Router, Request, Response } from 'express';
 import { supabase } from './supabaseClient.js';
 import bcrypt from 'bcrypt';
@@ -99,7 +99,7 @@ function requireAdminOrHigher() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Admin Authentication (PUBLIC - no auth required)
+// Admin Authentication (PUBLIC)
 // ─────────────────────────────────────────────────────────────────────────────
 
 router.post('/auth/login', async (req: Request, res: Response) => {
@@ -481,7 +481,6 @@ router.post('/teachers', requireAuth(), requireAdminOrHigher(), async (req: Requ
   }
 
   try {
-    // Check for existing email
     const { data: existingEmail } = await supabase
       .from('teachers')
       .select('id')
@@ -495,7 +494,6 @@ router.post('/teachers', requireAuth(), requireAdminOrHigher(), async (req: Requ
       });
     }
 
-    // Check for existing employee ID
     const { data: existingEmployeeId } = await supabase
       .from('teachers')
       .select('id')

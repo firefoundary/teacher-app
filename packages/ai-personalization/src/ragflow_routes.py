@@ -3,7 +3,7 @@ ragflow_routes.py — Flask Blueprint: /api/ragflow/*
 
 Flask routes for RAGFlow integration.
 """
-
+# TODO : Make it available for multiple different datasets. Currently only made it for one dataset and it routes to env
 
 import json
 import os
@@ -33,11 +33,11 @@ if os.getenv("GEMINI_API_KEY"):
 ragflow_bp = Blueprint("ragflow", __name__, url_prefix="/api/ragflow")
 DEFAULT_DATASET_NAME = os.getenv("RAGFLOW_DEFAULT_DATASET", "gurusikshan-ncert")
 DEFAULT_CHAT_ID = os.getenv("RAGFLOW_CHAT_ID", "")
-JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-key")  # Same secret as backend Node.js
+JWT_SECRET = os.getenv("JWT_SECRET", "your-super-secret-key")  # NOTE : both backend api and RAGFLOW service need same key , hence global env
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API Client Authentication for Backend to RAGFlow chat sessions)
+# API Client Authentication for Backend to RAGFlow chat sessions
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -71,7 +71,6 @@ def client_token():
         if not client_id or not client_secret:
             return jsonify(success=False, error="client_id and client_secret required"), 400
         
-        # Look up client in api_clients table
         result = db.client.table("api_clients")\
             .select("client_secret_hash, is_active, allowed_scopes, name")\
             .eq("client_id", client_id)\
@@ -86,7 +85,6 @@ def client_token():
         if not client.get("is_active"):
             return jsonify(success=False, error="Client is disabled"), 403
         
-        # Verify bcrypt hash
         stored_hash = client["client_secret_hash"]
         if not bcrypt.checkpw(client_secret.encode(), stored_hash.encode()):
             return jsonify(success=False, error="Invalid client_secret"), 401
@@ -98,25 +96,17 @@ def client_token():
         
         if not has_required_scopes:
             return jsonify(success=False, error="Insufficient scopes for chat operations"), 403
-        
-        # ─────────────────────────────────────────────────────────────────────
-        # FIX: Generate an aligned JWT token compatible with both backends
-        # ─────────────────────────────────────────────────────────────────────
+
         payload = {
-            "sub": client_id,                  # Standard identifier claim (Node.js/Supabase looks for this)
+            "sub": client_id,        
             "client_id": client_id,
             "name": client.get("name", "API Client"),
             "scopes": scopes,
-            
-            # Crucial claim: Allows the token to pass through requireAdminOrHigher() in TypeScript
             "role": "admin",                   
-            
-            # Match standard user token audiences if your TS middleware checks for it
             "aud": "authenticated",            
-            
-            "iss": "guru-sikshan-ai-service",  # Issuer tracking
+            "iss": "guru-sikshan-ai-service",
             "iat": int(time.time()),
-            "exp": int(time.time()) + 900,     # 15 minutes
+            "exp": int(time.time()) + 900,     # 15 minutes wrapper
         }
         
         token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
@@ -162,15 +152,14 @@ def require_jwt(auth_required: bool = True) -> callable:
                 if auth_required:
                     return jsonify(error="Missing or invalid authorization token"), 401
                 
-                # Token not required, skip validation
+                # Token not required ig
                 g.user = None
                 return f(*args, **kwargs)
             
             token = auth_header.split(" ")[1]
             
             try:
-                # Decode JWT token
-                # New line: Tells PyJWT to skip audience verification
+                # skip audience verification , not needed
                 payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"], options={"verify_aud": False})
                 g.user = payload
             except jwt.ExpiredSignatureError:
@@ -336,11 +325,11 @@ def _extract_document_ids(payload: Any) -> List[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Health & Status (NO AUTH NEEDED - public endpoint)
+# Health & Status , no auth needed for these
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-
+#DONE
 @ragflow_bp.route("/health", methods=["GET"])
 def health():
     """Check RAGFlow service health status."""
@@ -376,11 +365,11 @@ def health():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Dataset Management (AUTH + ADMIN REQUIRED)
+# Dataset Management , auth needed
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-
+#DONE
 @ragflow_bp.route("/datasets", methods=["GET"])
 @require_jwt(auth_required=True)
 def list_datasets():
@@ -396,7 +385,7 @@ def list_datasets():
         return jsonify(error=str(e)), 500
 
 
-
+#DONE
 @ragflow_bp.route("/datasets", methods=["POST"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -420,7 +409,7 @@ def create_dataset():
         return jsonify(error=str(e)), 500
 
 
-
+#DONE
 @ragflow_bp.route("/datasets/<dataset_id>", methods=["DELETE"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -434,7 +423,7 @@ def delete_dataset(dataset_id: str):
         return jsonify(error=str(e)), 500
 
 
-
+#DONE
 @ragflow_bp.route("/datasets/resolve", methods=["POST"])
 @require_jwt(auth_required=True)
 def resolve_dataset():
@@ -453,11 +442,11 @@ def resolve_dataset():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Document Management (AUTH + ADMIN REQUIRED for writes)
+# Document Management , admin for write requests
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-
+#DONE
 @ragflow_bp.route("/datasets/<dataset_id>/documents", methods=["GET"])
 @require_jwt(auth_required=True)
 def list_documents(dataset_id: str):
@@ -472,7 +461,7 @@ def list_documents(dataset_id: str):
         return jsonify(error=str(e)), 500
 
 
-
+#DONE
 @ragflow_bp.route("/datasets/<dataset_id>/documents", methods=["POST"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -510,7 +499,7 @@ def upload_document(dataset_id: str):
         return jsonify(error=str(e)), 500
 
 
-
+#DONE
 @ragflow_bp.route("/datasets/<dataset_id>/chunks", methods=["POST"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -530,7 +519,7 @@ def parse_documents(dataset_id: str):
         return jsonify(error=str(e)), 500
 
 
-
+#DONE
 @ragflow_bp.route("/datasets/<dataset_id>/documents", methods=["DELETE"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -553,7 +542,8 @@ def delete_documents(dataset_id: str):
         return jsonify(error=str(e)), 500
 
 
-
+# Main
+# TODO : Update this function such that it atomic , either do it all or do none
 @ragflow_bp.route("/documents/upload-and-parse", methods=["POST"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -609,9 +599,9 @@ def upload_and_parse_document():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Chat Assistant Management (AUTH + ADMIN REQUIRED for writes)
+# Chat Assistant Management , same as before 
 # ─────────────────────────────────────────────────────────────────────────────
-
+# NOTE : These require dataset ID's for creation
 @ragflow_bp.route("/chats", methods=["POST"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -623,7 +613,6 @@ def create_chat():
         if not name:
             return jsonify(error="name required"), 400
         
-        # BUG FIX: Ensure dataset_ids defaults to an empty list so Python unpacking doesn't crash
         data["dataset_ids"] = data.get("dataset_ids", [])
         
         result = rf.create_chat_assistant(**data) if hasattr(rf, 'create_chat_assistant') else data
@@ -632,7 +621,7 @@ def create_chat():
         traceback.print_exc()
         return jsonify(error=str(e)), 500
 
-
+#DONE
 @ragflow_bp.route("/chats/<chat_id>", methods=["GET"])
 @require_jwt(auth_required=True)
 def get_chat(chat_id: str):
@@ -644,7 +633,7 @@ def get_chat(chat_id: str):
         traceback.print_exc()
         return jsonify(error=str(e)), 500
 
-
+#DONE
 @ragflow_bp.route("/chats/<chat_id>", methods=["PUT"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -661,7 +650,7 @@ def update_chat(chat_id: str):
         traceback.print_exc()
         return jsonify(error=str(e)), 500
 
-
+#DONE
 @ragflow_bp.route("/chats/<chat_id>", methods=["PATCH"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -675,7 +664,7 @@ def patch_chat(chat_id: str):
         traceback.print_exc()
         return jsonify(error=str(e)), 500
 
-
+#DONE
 @ragflow_bp.route("/chats/<chat_id>", methods=["DELETE"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -688,7 +677,7 @@ def delete_chat(chat_id: str):
         traceback.print_exc()
         return jsonify(error=str(e)), 500
 
-
+#DONE
 @ragflow_bp.route("/chats", methods=["DELETE"])
 @require_jwt(auth_required=True)
 @require_admin_or_higher()
@@ -702,13 +691,13 @@ def delete_chats_bulk():
         traceback.print_exc()
         return jsonify(error=str(e)), 500
 
-
+#DONE
 @ragflow_bp.route("/chats", methods=["GET"])
 @require_jwt(auth_required=True)
 def list_chats():
     """List chat assistants with optional pagination and filtering options."""
     try:
-        # Extract filter/query parameters safely from args dict
+        # Extract filter parameters safely from args dict
         params = {k: v for k, v in request.args.items()}
         result = rf.list_chat_assistants(**params)
         return jsonify(success=True, result=result)
@@ -716,6 +705,8 @@ def list_chats():
         traceback.print_exc()
         return jsonify(error=str(e)), 500
     
+#DONE 
+# NOTE : Works for all chat windows but the public chat sessions are stateless so they dont store shit
 @ragflow_bp.route("/chats/<chat_id>/sessions/<session_id>", methods=["GET"])
 @require_jwt(auth_required=True)
 def get_session_history(chat_id: str, session_id: str):
@@ -733,7 +724,7 @@ def get_session_history(chat_id: str, session_id: str):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Choices-Based Completion Streaming Endpoints (AUTH REQUIRED)
+# Choices-Based Completion Streaming Endpoints (these work)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @ragflow_bp.route("/query/completion/stateless", methods=["POST"])
@@ -769,7 +760,7 @@ def completion_stateless():
         traceback.print_exc()
         return jsonify(error=str(e)), 500
 
-
+# NOTE : These work but they are still not stateful by defination , it just saves the data in a session
 @ragflow_bp.route("/query/completion/stateful", methods=["POST"])
 @require_jwt(auth_required=True)
 def completion_stateful():
@@ -788,7 +779,6 @@ def completion_stateful():
         def event_stream():
             try:
                 for chunk in rf.chat_completion_stream_stateful(question=final_question, session_id=session_id, chat_id=chat_id):
-                    # BUG FIX: chunk already includes "data: ". Remove the wrapper.
                     yield f"{chunk}\n\n"
             except Exception as stream_err:
                 yield f"data: {json.dumps({'error': str(stream_err)})}\n\n"
@@ -808,9 +798,8 @@ def completion_stateful():
         return jsonify(error=str(e)), 500
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Query & Retrieval (AUTH REQUIRED, ADMIN NOT REQUIRED for reads)
+# Query & Retrieval , DONE
 # ─────────────────────────────────────────────────────────────────────────────
-
 
 
 @ragflow_bp.route("/query/ask", methods=["POST"])
@@ -872,7 +861,7 @@ def ask():
         return jsonify(error=str(e)), 500
 
 
-
+#DONE , works
 @ragflow_bp.route("/query/retrieve", methods=["POST"])
 @require_jwt(auth_required=True)
 def retrieve():
@@ -906,7 +895,7 @@ def retrieve():
         return jsonify(error=str(e)), 500
 
 
-
+# Test route for all in one
 @ragflow_bp.route("/query/ask-from-dataset", methods=["POST"])
 @require_jwt(auth_required=True)
 def ask_from_dataset():
@@ -973,7 +962,7 @@ def ask_from_dataset():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Session Management (AUTH REQUIRED)
+# Session Management DONE
 # ─────────────────────────────────────────────────────────────────────────────
 
 

@@ -1,7 +1,7 @@
 /**
- * ragflow_client.ts — RAGFlow API Client (Backend)
+ * ragflow_client.ts — RAGFlow API Client , connects this backend to flask
  *
- * Provides type-safe functions for interacting with RAGFlow API endpoints directly.
+ * Provides type-safe functions for interacting with Flask API endpoints directly.
  * Handles:
  * - Dataset management and resolution
  * - Document upload, parsing, and deletion
@@ -10,8 +10,7 @@
  * - Session management
  * - Resource recommendations
  *
- * All calls go directly to RAGFlow (or Flask AI proxy if configured),
- * NOT through another backend endpoint.
+ * All calls go directly to Flask AI proxy
  */
 
 import fetch, { HeadersInit } from 'node-fetch';

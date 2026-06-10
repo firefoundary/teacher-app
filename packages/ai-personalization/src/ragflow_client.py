@@ -1,10 +1,10 @@
 """
-ragflow_client.py — RAGFlow /api/v1/* wrapper for Guru-Sikshan
+ragflow_client.py — RAGFlow /api/v1/* wrapper for the project
 
 Provides low-level HTTP client functions for interacting with RAGFlow's REST API.
 Handles authentication, request/response parsing, and error handling.
 """
-
+# NOTE : Almost every function has been implemented but not in use (some of em) by ragflow_routes.
 import os
 from pathlib import Path
 from typing import Dict, Any, List, Generator, Optional
@@ -329,7 +329,7 @@ def chat_completion_stream(
     question: str,
     chat_id: str = "",
     session_id: Optional[str] = None,
-    **kwargs,  # 1. Added **kwargs to gracefully swallow 'dataset_ids' or other arguments
+    **kwargs,  
 ) -> Generator[str, None, None]:
     """Get a chat completion response with streaming."""
     cid = _resolve_chat_id(chat_id)
@@ -346,11 +346,9 @@ def chat_completion_stream(
         }
     }
 
-    # 2. FIX: Forward the session_id to RAGFlow to preserve conversation history
     if session_id:
         payload["session_id"] = session_id
 
-    # 3. Optional: If RAGFlow needs the dataset_ids directly, forward them as well
     if "dataset_ids" in kwargs and kwargs["dataset_ids"]:
         payload["dataset_ids"] = kwargs["dataset_ids"]
 
@@ -377,18 +375,15 @@ def chat_completion_stream(
         try:
             data = json.loads(data_str)
             
-            # Capture references from final chunk
             delta = data.get("choices", [{}])[0].get("delta") or {}
             ref = delta.get("reference") or []
             if ref:
                 references = ref
             
-            # Pass through SSE
             yield f"data: {data_str}\n\n"
         except json.JSONDecodeError:
             continue
     
-    # Yield final metadata chunk with references
     yield f'event: metadata\ndata: {json.dumps({"references": references})}\n\n'
 
 def chat_completion_stream_stateless(messages: List[Dict[str, Any]], chat_id: str) -> Generator[str, None, None]:

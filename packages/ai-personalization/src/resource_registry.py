@@ -3,7 +3,7 @@ resource_registry.py
 Curated teacher-training content sources with geo-tagging.
 Used by ragflow_client.py to seed/recommend resources based on teacher location.
 """
-
+# TODO : This is just a base to use later when multiple datasets are available. Not rn , for now as long as it works for one dataset its fine
 from typing import List, Optional
 
 RESOURCE_REGISTRY = [
@@ -13,11 +13,11 @@ RESOURCE_REGISTRY = [
         "name": "ePathshala – Teacher Resources",
         "url": "https://epathshala.nic.in/epathshala.php?id=Teachers&ln=en",
         "languages": ["en", "hi"],
-        "states": ["ALL"],          # available pan-India
+        "states": ["ALL"],          
         "organisations": ["NCERT"],
         "tags": ["ncert", "textbook", "digital", "teacher-resource"],
         "competency_areas": ["content_knowledge", "pedagogy", "technology_usage"],
-        "priority": 1,              # highest = most exemplary
+        "priority": 1,              
         "exemplary": True,
     },
     {
@@ -88,7 +88,7 @@ RESOURCE_REGISTRY = [
     },
 
     # ── ADDITIONAL DISCOVERABLE STATE RESOURCES ──────────────────────────────
-    # These follow the same pattern; add more state SCERT/DIET portals here.
+    # These follow the same pattern , add more state SCERT/DIET portals here.
     {
         "id": "scert-up",
         "name": "SCERT Uttar Pradesh",
