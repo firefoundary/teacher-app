@@ -1,0 +1,89 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    networks:
+      - ragflow
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-personalization:
+    build:
+      context: ./Backend/ai-personalization
+      dockerfile: Dockerfile
+    container_name: guru-ai-service
+    ports:
+      - "5001:5001"
+    env_file: .env
+    environment:
+      - RAGFLOW_CHAT_ID=${RAGFLOW_CHAT_ID}
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=5001
+      - RAGFLOW_BASE_URL=${RAGFLOW_BASE_URL}
+    volumes:
+      - ./Backend/ai-personalization/chroma_db:/app/src/chroma_db
+      - ./Backend/ai-personalization/src/uploads:/app/src/uploads
+    networks:
+      - ragflow
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  backend-api:
+    build:
+      context: ./Backend/backend-api
+      dockerfile: Dockerfile
+    container_name: guru-backend
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file: .env
+    environment:
+      - AI_SERVICE_URL=http://guru-ai-service:5001
+      - NODE_ENV=production
+    networks:
+      - ragflow
+    restart: unless-stopped
+    depends_on:
+      - ai-personalization
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend-dashboard:
+    build:
+      context: ./Frontend/frontend-dashboard
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    container_name: guru-frontend
+    ports:
+      - "5173:80"
+    networks:
+      - ragflow
+    restart: unless-stopped
+    depends_on:
+      - backend-api
+networks:
+  ragflow:
+    driver: bridge

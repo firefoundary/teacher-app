@@ -1,0 +1,217 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* DIET Admin Dashboard Design System - All colors MUST be HSL */
+
+@layer base {
+  :root {
+    /* DIET Primary Blue: #003d82 = hsl(212, 100%, 25.5%) */
+    --background: 210 20% 98%;
+    --foreground: 212 80% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 212 80% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 212 80% 15%;
+
+    /* Primary DIET Blue */
+    --primary: 212 100% 25.5%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 212 80% 15%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 212 15% 45%;
+
+    --accent: 210 40% 94%;
+    --accent-foreground: 212 100% 25.5%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success color for positive feedback */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning color */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 212 100% 25.5%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar specific */
+    --sidebar-background: 212 100% 25.5%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 212 100% 25.5%;
+    --sidebar-accent: 212 100% 35%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 212 100% 35%;
+    --sidebar-ring: 0 0% 100%;
+
+    /* Custom shadows as CSS variables */
+    --shadow-card: 0 10px 25px hsla(212, 100%, 25.5%, 0.05);
+    --shadow-card-hover: 0 15px 35px hsla(212, 100%, 25.5%, 0.1);
+  }
+
+  .dark {
+    --background: 212 80% 8%;
+    --foreground: 210 20% 98%;
+
+    --card: 212 70% 12%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 212 70% 12%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary: 212 100% 60%;
+    --primary-foreground: 212 80% 8%;
+
+    --secondary: 212 50% 20%;
+    --secondary-foreground: 210 20% 98%;
+
+    --muted: 212 50% 20%;
+    --muted-foreground: 210 20% 70%;
+
+    --accent: 212 50% 25%;
+    --accent-foreground: 210 20% 98%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 212 50% 20%;
+    --input: 212 50% 20%;
+    --ring: 212 100% 60%;
+
+    --sidebar-background: 212 80% 8%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 212 100% 60%;
+    --sidebar-primary-foreground: 212 80% 8%;
+    --sidebar-accent: 212 50% 20%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 212 50% 20%;
+    --sidebar-ring: 212 100% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+@layer components {
+  /* Dashboard card styling */
+  .dashboard-card {
+    @apply rounded-[20px] bg-card border border-border p-6;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+  }
+
+  .dashboard-card:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  /* Table styling */
+  .data-table {
+    @apply w-full border-collapse;
+  }
+
+  .data-table th {
+    @apply text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground px-4 py-3 bg-muted/50;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 border-b border-border;
+  }
+
+  .data-table tr:hover td {
+    @apply bg-accent/50;
+  }
+
+  /* Input styling */
+  .input-field {
+    @apply w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground;
+    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent;
+    @apply placeholder:text-muted-foreground transition-all duration-200;
+  }
+
+  /* Button base */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg;
+    @apply bg-primary text-primary-foreground font-medium;
+    @apply hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
+    @apply transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg;
+    @apply bg-secondary text-secondary-foreground font-medium;
+    @apply hover:bg-secondary/80 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2;
+    @apply transition-all duration-200;
+  }
+
+  /* Badge styling */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply bg-success/10 text-success;
+  }
+
+  .badge-warning {
+    @apply bg-warning/10 text-warning;
+  }
+
+  .badge-destructive {
+    @apply bg-destructive/10 text-destructive;
+  }
+
+  .badge-primary {
+    @apply bg-primary/10 text-primary;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+}
