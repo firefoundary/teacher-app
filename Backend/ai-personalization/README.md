@@ -130,29 +130,6 @@ Utility for creating seeded or onboarding client accounts.
 
 ---
 
-## Docker Notes
-
-If you are using Compose from the repo root, the backend should point to:
-
-```env
-AI_SERVICE_URL=http://ai-personalization:5001
-```
-
-Inside Docker networking, `ai-personalization` should be the service name, while `localhost` is only for direct local execution on your.
-
----
-
-## Security Notes
-
-- Treat this as a backend-only service.
-- Use `SUPABASE_SERVICE_ROLE_KEY` only on the server.
-- Do not expose secrets to the frontend.
-- Rate-limit public routes.
-- Audit-log sensitive actions.
-- Validate uploads and limit file sizes.
-
----
-
 ## Quick Start
 
 ```bash
