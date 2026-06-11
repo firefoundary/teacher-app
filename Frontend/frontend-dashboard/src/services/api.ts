@@ -1,5 +1,5 @@
 /**
- * api.ts — Backend API Client (SECURED VERSION)
+ * api.ts — Backend API Client
  *
  * Provides type-safe functions for interacting with backend API endpoints.
  * Handles:
@@ -9,7 +9,7 @@
  * - AI/FLASK operations (via backend, not direct Flask)
  *
  * Security:
- * - All calls require JWT authentication (via getRequestHeaders)
+ * - All calls require JWT authentication
  * - NO direct Supabase access
  * - NO direct Flask AI access
  * - All writes go through backend for auth/middleware

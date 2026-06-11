@@ -1,5 +1,3 @@
-// utils/auth.ts — clean Supabase JWT auth, no Elevate dependency
-
 const TOKEN_KEY = 'diet_admin_token';
 
 export function getRequestHeaders(

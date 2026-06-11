@@ -20,7 +20,7 @@ services:
 
   ai-personalization:
     build:
-      context: ./packages/ai-personalization
+      context: ./Backend/ai-personalization
       dockerfile: Dockerfile
     container_name: guru-ai-service
     ports:
@@ -32,8 +32,8 @@ services:
       - FLASK_PORT=5001
       - RAGFLOW_BASE_URL=${RAGFLOW_BASE_URL}
     volumes:
-      - ./packages/ai-personalization/chroma_db:/app/src/chroma_db
-      - ./packages/ai-personalization/src/uploads:/app/src/uploads
+      - ./Backend/ai-personalization/chroma_db:/app/src/chroma_db
+      - ./Backend/ai-personalization/src/uploads:/app/src/uploads
     networks:
       - ragflow
     restart: unless-stopped
@@ -51,7 +51,7 @@ services:
 
   backend-api:
     build:
-      context: ./packages/backend-api
+      context: ./Backend/backend-api
       dockerfile: Dockerfile
     container_name: guru-backend
     ports:
@@ -70,7 +70,7 @@ services:
 
   frontend-dashboard:
     build:
-      context: ./packages/frontend-dashboard
+      context: ./Frontend/frontend-dashboard
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
