@@ -3,8 +3,8 @@ import os
 import time
 import uuid
 import json
+from datetime import datetime, timezone, timedelta
 from flask import Blueprint, request, jsonify, stream_with_context, Response, g
-from supabase import create_client
 from middleware.auth_middleware import require_token
 from middleware.rate_limiter import rate_limit
 from middleware.audit_logger import log_request
@@ -15,14 +15,13 @@ from ragflow_client import (
 )
 from dotenv import load_dotenv, find_dotenv
 
+# Import our native Postgres client
+from database_client import db
+
 # Load environment variables
 load_dotenv(find_dotenv(), override=False)
 
 public_chat_bp = Blueprint("public_chat", __name__, url_prefix="/api/public/chat")
-
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-_sb = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "86400"))  # 24 hours
 
@@ -129,17 +128,37 @@ def create_session():
             "details": str(e),
         }), 502
 
-    from datetime import datetime, timezone, timedelta
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=SESSION_TTL_SECONDS)
 
-    _sb.table("api_sessions").insert({
-        "client_id":           g.client_id,
-        "external_user_id":    external_user_id,
-        "internal_session_id": session_id,
-        "ragflow_session_id":  rf_session_id,
-        "context_json":        context,
-        "expires_at":          expires_at.isoformat(),
-    }).execute()
+    # Save session to native Postgres
+    conn = None
+    try:
+        conn = db._get_connection()
+        cur = conn.cursor()
+        
+        insert_query = """
+            INSERT INTO api_sessions 
+            (client_id, external_user_id, internal_session_id, ragflow_session_id, context_json, expires_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        
+        cur.execute(insert_query, (
+            g.client_id,
+            external_user_id,
+            session_id,
+            rf_session_id,
+            json.dumps(context),
+            expires_at.isoformat()
+        ))
+        conn.commit()
+    except Exception as db_err:
+        if conn:
+            conn.rollback()
+        log_request("/chat/session", 500, start, f"db_error: {db_err}")
+        return jsonify({"error": "db_error", "message": "Failed to save session"}), 500
+    finally:
+        if conn:
+            conn.close()
 
     log_request("/chat/session", 201, start)
     return jsonify({
@@ -150,25 +169,42 @@ def create_session():
 
 def _get_valid_session(session_id: str, client_id: str):
     """Fetch session row, enforce ownership + expiry without crashing on 0 rows."""
-    from datetime import datetime, timezone
-    
-    result = (
-        _sb.table("api_sessions")
-        .select("*")
-        .eq("internal_session_id", session_id)
-        .eq("client_id", client_id)
-        .execute()
-    )
-    
-    if not result.data or len(result.data) == 0:
-        return None, "session_not_found"
+    conn = None
+    try:
+        conn = db._get_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            SELECT * FROM api_sessions 
+            WHERE internal_session_id = %s AND client_id = %s 
+            LIMIT 1
+        """, (session_id, client_id))
+        
+        row = cur.fetchone()
+        
+        if not row:
+            return None, "session_not_found"
 
-    row = result.data[0]
-    expires_at = datetime.fromisoformat(row["expires_at"])
-    if expires_at < datetime.now(timezone.utc):
-        return None, "session_expired"
+        # psycopg2 automatically parses Postgres timestamps into datetime objects, 
+        # but we defend against string formats just in case.
+        expires_at = row["expires_at"]
+        if isinstance(expires_at, str):
+            expires_at = datetime.fromisoformat(expires_at)
+        
+        # Ensure it is timezone-aware before comparison
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
 
-    return row, None
+        if expires_at < datetime.now(timezone.utc):
+            return None, "session_expired"
+
+        return row, None
+    except Exception as e:
+        print(f"[WARN] Database error fetching session: {e}")
+        return None, "db_error"
+    finally:
+        if conn:
+            conn.close()
 
 
 # ── send message ─────────────────────────────────────────────

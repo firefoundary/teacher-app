@@ -26,7 +26,7 @@ from flask_cors import CORS
 from ragflow_routes import ragflow_bp
 
 # Initialize database
-from supabase_client import db
+from database_client import db
 
 print("\n" + "=" * 80)
 print("INITIALIZING AI PERSONALIZATION SERVICE")

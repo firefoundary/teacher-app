@@ -21,7 +21,7 @@ import jwt
 
 import ragflow_client as rf
 from resource_registry import get_resources_for_cluster, get_exemplary_resources
-from supabase_client import db
+from database_client import db
 
 
 # Initialize Gemini API if key is available

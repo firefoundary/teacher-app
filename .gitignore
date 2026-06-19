@@ -1,0 +1,39 @@
+# =========================
+# Security & Credentials
+# =========================
+.env
+*.env
+.env.local
+
+# =========================
+# Databases & Storage
+# =========================
+postgres-data/
+*.sqlite3
+/Backend/ai-personalization/chroma_db/
+/Backend/ai-personalization/uploads/
+
+# =========================
+# Python & Virtual Environments
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# =========================
+# Node & Frontend (Vite)
+# =========================
+node_modules/
+dist/
+build/
+.npm/
+
+# =========================
+# OS & Editor Files
+# =========================
+.DS_Store
+.vscode/
+.idea/

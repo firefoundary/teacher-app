@@ -1,6 +1,6 @@
-# TODO : Clear this out. 
 import os
-from supabase import create_client, Client
+import psycopg2
+from psycopg2.extras import RealDictCursor, Json
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -8,22 +8,26 @@ current_dir = Path(__file__).parent
 dotenv_path = current_dir.parent.parent.parent / '.env'
 load_dotenv(dotenv_path=dotenv_path)
 
-
-class SupabaseDB:
+class PostgresDB:
     def __init__(self):
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY_PYTHON")
+        self.db_url = os.getenv("DATABASE_URL")
         
-        if not url or not key:
-            raise ValueError("SUPABASE_URL and SUPABASE_KEY_PYTHON must be set in .env file")
-        
-        self.client: Client = create_client(url, key)
+        if not self.db_url:
+            raise ValueError("DATABASE_URL must be set in .env file")
+            
+    def _get_connection(self):
+        """Creates and returns a new database connection."""
+        return psycopg2.connect(self.db_url, cursor_factory=RealDictCursor)
     
     def get_teachers_by_cluster(self, cluster_id):
         """Fetch all teachers in a cluster using 'cluster' column"""
         try:
-            response = self.client.table('teachers').select('*').eq('cluster', cluster_id).execute()
-            return response.data
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM teachers WHERE cluster = %s", (cluster_id,))
+            data = cur.fetchall()
+            conn.close()
+            return data
         except Exception as e:
             print(f"Error fetching cluster teachers: {e}")
             return []
@@ -31,8 +35,12 @@ class SupabaseDB:
     def get_issue_competency_mappings(self):
         """Fetch all issue-to-competency keyword mappings"""
         try:
-            response = self.client.table('issue_competency_mapping').select('*').execute()
-            return response.data if response.data else []
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM issue_competency_mapping")
+            data = cur.fetchall()
+            conn.close()
+            return data
         except Exception as e:
             print(f"Error loading mappings: {e}")
             return []
@@ -40,8 +48,12 @@ class SupabaseDB:
     def get_teacher_issues(self, teacher_id):
         """Fetch all issues mapped to a specific teacher."""
         try:
-            response = self.client.table('issues').select('*').eq('teacher_id', teacher_id).execute()
-            return response.data if response.data else []
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM issues WHERE teacher_id = %s", (teacher_id,))
+            data = cur.fetchall()
+            conn.close()
+            return data
         except Exception as e:
             print(f"Error fetching teacher issues: {e}")
             return []
@@ -49,28 +61,30 @@ class SupabaseDB:
     def get_issue_by_id(self, issue_id: str):
         """Fetch a single issue by its unique ID."""
         try:
-            response = self.client.table('issues').select('*').eq('id', issue_id).execute()
-            return response.data[0] if response.data else None
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM issues WHERE id = %s", (issue_id,))
+            data = cur.fetchone()
+            conn.close()
+            return data
         except Exception as e:
             print(f"Error fetching issue by ID: {e}")
             return None
     
     # Backward compatibility alias
     def get_teacher_feedback(self, teacher_id):
-        """
-        DEPRECATED: Legacy method - use get_teacher_issues instead
-        This method is no longer used (teacher-app removed)
-        """
+        """DEPRECATED: Legacy method - use get_teacher_issues instead"""
         return self.get_teacher_issues(teacher_id)
     
     def get_cluster_issues(self, cluster_id):
         """Fetch all issues from a cluster"""
         try:
-            response = self.client.table('issues')\
-                .select('*')\
-                .eq('cluster', cluster_id)\
-                .execute()
-            return response.data if response.data else []
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM issues WHERE cluster = %s", (cluster_id,))
+            data = cur.fetchall()
+            conn.close()
+            return data
         except Exception as e:
             print(f"Error fetching cluster issues: {e}")
             return []
@@ -83,8 +97,12 @@ class SupabaseDB:
     def get_base_training_module(self, module_id):
         """Fetch base module/resource content for personalization pipeline."""
         try:
-            response = self.client.table('training_modules').select('*').eq('id', module_id).execute()
-            return response.data[0] if response.data else None
+            conn = self._get_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT * FROM training_modules WHERE id = %s", (module_id,))
+            data = cur.fetchone()
+            conn.close()
+            return data
         except Exception as e:
             print(f"Error fetching module: {e}")
             return None
@@ -92,34 +110,53 @@ class SupabaseDB:
     def save_personalized_training(self, teacher_id, module_id, personalized_content, metadata):
         """Save personalized training assignment"""
         try:
-            data = {
-                'teacher_id': teacher_id,
-                'module_id': module_id,
-                'personalized_content': personalized_content,
-                'adaptation_metadata': metadata,
-                'status': 'assigned',
-                'completion_percentage': 0
-            }
-            response = self.client.table('personalized_training').insert(data).execute()
-            return response.data
+            conn = self._get_connection()
+            cur = conn.cursor()
+            
+            # Using RETURNING * mimics the behavior of Supabase returning the inserted row
+            insert_query = """
+                INSERT INTO personalized_training 
+                (teacher_id, module_id, personalized_content, adaptation_metadata, status, completion_percentage) 
+                VALUES (%s, %s, %s, %s, %s, %s) 
+                RETURNING *
+            """
+            
+            # Json() securely casts the Python dictionary to Postgres JSONB format
+            cur.execute(insert_query, (
+                teacher_id, 
+                module_id, 
+                personalized_content, 
+                Json(metadata), 
+                'assigned', 
+                0
+            ))
+            
+            inserted_row = cur.fetchone()
+            conn.commit()
+            conn.close()
+            
+            # Supabase usually returns a list even for single inserts, so we wrap it to prevent downstream breaking
+            return [inserted_row] if inserted_row else None
+            
         except Exception as e:
             print(f"Error saving personalized training: {e}")
             return None
     
     # Backward compatibility alias 
     def get_feedback_by_id(self, feedback_id: str):
-        """
-        DEPRECATED: Legacy method - use get_issue_by_id instead
-        This method is no longer used (teacher-app removed)
-        """
+        """DEPRECATED: Legacy method - use get_issue_by_id instead"""
         return self.get_issue_by_id(feedback_id)
 
     def initialize_default_mappings(self):
         """Initialize default keyword mappings if table is empty"""
         try:
-            existing = self.client.table('issue_competency_mapping').select('count', count='exact').execute()
+            conn = self._get_connection()
+            cur = conn.cursor()
             
-            if existing.count == 0:
+            cur.execute("SELECT COUNT(*) FROM issue_competency_mapping")
+            count = cur.fetchone()['count']
+            
+            if count == 0:
                 print("Initializing default issue_competency_mapping data...")
                 
                 default_mappings = [
@@ -151,18 +188,22 @@ class SupabaseDB:
                     {'issue_keyword': 'interest', 'competency_area': 'student_engagement', 'confidence_score': 0.80},
                 ]
                 
-                for mapping in default_mappings:
-                    try:
-                        self.client.table('issue_competency_mapping').insert(mapping).execute()
-                    except Exception as e:
-                        print(f"Error inserting mapping {mapping['issue_keyword']}: {e}")
+                insert_query = """
+                    INSERT INTO issue_competency_mapping (issue_keyword, competency_area, confidence_score)
+                    VALUES (%(issue_keyword)s, %(competency_area)s, %(confidence_score)s)
+                """
+                
+                # executemany processes the entire list efficiently in one transaction
+                cur.executemany(insert_query, default_mappings)
+                conn.commit()
                 
                 print(f"✓ Initialized {len(default_mappings)} default mappings")
             else:
-                print(f"✓ Database already has {existing.count} mappings")
+                print(f"✓ Database already has {count} mappings")
+                
+            conn.close()
         except Exception as e:
             print(f"Error initializing mappings: {e}")
 
-
-# Initialize global instance
-db = SupabaseDB()
+# Initialize global instance, identical to previous SupabaseDB behavior
+db = PostgresDB()

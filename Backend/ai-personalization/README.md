@@ -12,7 +12,7 @@ Python service that powers authenticated public chat, retrieval, and personaliza
 | Auth | JWT + custom client auth |
 | Vector Store | ChromaDB |
 | AI / RAG | RAGFlow |
-| Database | Supabase |
+| Database | Postgres |
 | Containerization | Docker |
 
 ---

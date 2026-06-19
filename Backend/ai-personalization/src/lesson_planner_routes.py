@@ -5,7 +5,7 @@ Lesson Planner feature for Guru-Sikshan.
 
 Handles:
   - Lesson plan generation (Gemini + RAGFlow context)
-  - Saved lesson plan CRUD (Supabase)
+  - Saved lesson plan CRUD (PostgreSQL)
   - Teacher-level history / retrieval
   - Assignment sheet generation
   - Quick topic retrieval (RAG-only, no LLM)
@@ -25,7 +25,7 @@ import jwt as pyjwt
 import os
 
 import ragflow_client as rf
-from supabase_client import db
+from database_client import db
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Blueprint setup
@@ -107,7 +107,7 @@ def _clean_gemini_json(text: str) -> Dict[str, Any]:
                 raw = raw[4:].strip()
     return json.loads(raw)
 
-#WORKS
+# WORKS
 def _resolve_dataset_id(board: str = "CBSE", explicit_dataset_id: str = "") -> str:
     """
     Dynamically maps the requested school board to a live RAGFlow dataset UUID
@@ -116,22 +116,28 @@ def _resolve_dataset_id(board: str = "CBSE", explicit_dataset_id: str = "") -> s
     if explicit_dataset_id:
         return explicit_dataset_id
 
+    conn = None
     try:
-        result = (
-            db.client.table("resource_source_routing")
-            .select("ragflow_dataset_id")
-            .eq("board", board)
-            .eq("is_active", True)
-            .order("priority", desc=True) 
-            .execute()
-        )
+        conn = db._get_connection()
+        cur = conn.cursor()
         
-        if result.data and len(result.data) > 0:
-            resolved_id = result.data[0].get("ragflow_dataset_id")
-            if resolved_id:
-                return resolved_id
+        cur.execute("""
+            SELECT ragflow_dataset_id 
+            FROM resource_source_routing 
+            WHERE board = %s AND is_active = TRUE 
+            ORDER BY priority DESC 
+            LIMIT 1
+        """, (board,))
+        
+        row = cur.fetchone()
+        if row and row.get("ragflow_dataset_id"):
+            return row["ragflow_dataset_id"]
+            
     except Exception as err:
         print(f"[WARN] Database lookup on resource_source_routing failed: {err}")
+    finally:
+        if conn:
+            conn.close()
 
     fallback_id = os.getenv("RAGFLOW_DEFAULT_DATASET_ID")
     if not fallback_id:
@@ -139,21 +145,22 @@ def _resolve_dataset_id(board: str = "CBSE", explicit_dataset_id: str = "") -> s
         
     return fallback_id
 
-#Depricated for now 
+# Deprecated for now 
 def _teacher_cluster(teacher_id: str) -> str:
+    conn = None
     try:
-        result = (
-            db.client.table("teachers")
-            .select("cluster")
-            .eq("id", teacher_id)
-            .single()
-            .execute()
-        )
-        return (result.data or {}).get("cluster", "") or ""
+        conn = db._get_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT cluster FROM teachers WHERE id = %s", (teacher_id,))
+        row = cur.fetchone()
+        return row.get("cluster", "") if row else ""
     except Exception:
         return ""
+    finally:
+        if conn:
+            conn.close()
 
-#WORKS , base prompt for a all in one response
+# WORKS , base prompt for a all in one response
 def _build_lesson_prompt(
     class_name: str,
     subject: str,
@@ -245,7 +252,7 @@ def generate_lesson():
       language         str  optional  default "English"
       board            str  optional  default "CBSE"
       learning_objectives list[str] optional
-      save             bool optional  default False — auto-save to Supabase
+      save             bool optional  default False — auto-save to Postgres
     """
     try:
         data = request.json or {}
@@ -317,33 +324,48 @@ def generate_lesson():
         lesson     = result.get("lesson")
         assignment = result.get("assignment")
 
-        # Optionally save to Supabase , normally dont ig 
+        # Optionally save to Postgres, normally dont ig 
         saved_id = None
         if auto_save and teacher_id and lesson:
+            conn = None
             try:
-                insert_result = (
-                    db.client.table("lesson_plans")
-                    .insert({
-                        "teacher_id":    teacher_id,
-                        "class_name":    class_name,
-                        "subject":       subject,
-                        "topic":         topic,
-                        "board":         board,
-                        "language":      language,
-                        "duration_minutes": duration_minutes,
-                        "lesson_json":   json.dumps(lesson),
-                        "assignment_json": json.dumps(assignment) if assignment else None,
-                        "dataset_id":    dataset_id or None,
-                        "rag_chunks_used": len(chunks),
-                        "status":        "generated",
-                    })
-                    .execute()
-                )
-                saved = insert_result.data
-                if saved:
-                    saved_id = (saved[0] if isinstance(saved, list) else saved).get("id")
+                conn = db._get_connection()
+                cur = conn.cursor()
+                
+                insert_query = """
+                    INSERT INTO lesson_plans 
+                    (teacher_id, class_name, subject, topic, board, language, duration_minutes, lesson_json, assignment_json, dataset_id, rag_chunks_used, status) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                    RETURNING id
+                """
+                
+                cur.execute(insert_query, (
+                    teacher_id, 
+                    class_name, 
+                    subject, 
+                    topic, 
+                    board, 
+                    language, 
+                    duration_minutes,
+                    json.dumps(lesson),
+                    json.dumps(assignment) if assignment else None,
+                    dataset_id or None,
+                    len(chunks),
+                    "generated"
+                ))
+                
+                inserted_row = cur.fetchone()
+                if inserted_row:
+                    saved_id = inserted_row.get("id")
+                    
+                conn.commit()
             except Exception as save_err:
                 print(f"[WARN] Auto-save to lesson_plans failed: {save_err}")
+                if conn:
+                    conn.rollback()
+            finally:
+                if conn:
+                    conn.close()
 
         return jsonify(
             success=True,
@@ -424,19 +446,25 @@ def regenerate_assignment(plan_id: str):
       num_short_answer int  default 2
       num_activity     int  default 1
     """
+    conn = None
     try:
-        # Fetch existing plan
-        result = (
-            db.client.table("lesson_plans")
-            .select("class_name, subject, topic, board, language, lesson_json")
-            .eq("id", plan_id)
-            .single()
-            .execute()
-        )
-        if not result.data:
+        # Fetch existing plan natively
+        conn = db._get_connection()
+        cur = conn.cursor()
+        
+        cur.execute("""
+            SELECT class_name, subject, topic, board, language, lesson_json 
+            FROM lesson_plans 
+            WHERE id = %s
+        """, (plan_id,))
+        
+        plan = cur.fetchone()
+        
+        if not plan:
+            if conn:
+                conn.close()
             return jsonify(error="Plan not found"), 404
 
-        plan = result.data if not isinstance(result.data, list) else result.data[0]
         data = request.json or {}
 
         num_mcq          = int(data.get("num_mcq", 3))
@@ -452,9 +480,9 @@ def regenerate_assignment(plan_id: str):
 
         prompt = f"""Create a student assignment for this lesson.
 
-Class: {plan['class_name']}
-Subject: {plan['subject']}
-Topic: {plan['topic']}
+Class: {plan.get('class_name')}
+Subject: {plan.get('subject')}
+Topic: {plan.get('topic')}
 Board: {plan.get('board', 'CBSE')}
 
 Return ONLY valid JSON:
@@ -480,11 +508,17 @@ Generate {num_mcq} MCQs, {num_short_answer} short-answer, {num_activity} activit
         response   = model.generate_content(prompt)
         assignment = _clean_gemini_json(response.text)
 
-        # Persist updated assignment
-        db.client.table("lesson_plans").update({
-            "assignment_json": json.dumps(assignment),
-            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        }).eq("id", plan_id).execute()
+        # Persist updated assignment natively
+        try:
+            cur.execute("""
+                UPDATE lesson_plans 
+                SET assignment_json = %s, updated_at = NOW() 
+                WHERE id = %s
+            """, (json.dumps(assignment), plan_id))
+            conn.commit()
+        except Exception as update_err:
+            conn.rollback()
+            raise update_err
 
         return jsonify(success=True, assignment=assignment, plan_id=plan_id)
 
@@ -494,3 +528,6 @@ Generate {num_mcq} MCQs, {num_short_answer} short-answer, {num_activity} activit
     except Exception as e:
         traceback.print_exc()
         return jsonify(error=str(e)), 500
+    finally:
+        if conn:
+            conn.close()
